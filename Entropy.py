@@ -11,12 +11,12 @@ print(" Sample's count: %d" % arr.size, "\n Frequency of discretization: %d" % s
 
 def frames_create():
     n = arr.size
-    frame_length = 20
+    frame_length = 25
     hop_length = 10
     dt = time*1000/n
     step = int(hop_length/dt)
     frame_edge = int(frame_length/dt)
-
+# arr[i:i+frame_edge+1]
     frames_matrix = np.array([])
     for i in range(0, n-2*step, step):
         temp = np.array([arr[j] for j in range(i, i+frame_edge, 1)])
@@ -24,9 +24,10 @@ def frames_create():
     frames_matrix = np.reshape(frames_matrix, (int((n-2*step)/step)+1, frame_edge))
     return frames_matrix
 
-def count_frames(frame, l=5):
+def count_frames(frame, l=9):
     counts_frame = list()
     bins = round(len(frame)/l)
+    print("bins size:", bins)
     for i in range(round(len(frame)/l)):
         counts_ampl = {}
         for amp in frame[i*l:i*l+l]:
@@ -61,6 +62,7 @@ def frame_MFCC(frame, sr=sr):
 
 
 frames = frames_create()
+print(frames.shape)
 temp1 = frame_entropy(frames[100])
 temp2 = frame_energy(frames[100])
 temp3 = frame_MFCC(frames[100])
