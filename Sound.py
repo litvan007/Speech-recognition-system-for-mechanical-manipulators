@@ -10,7 +10,7 @@ audio_data = "./sa"
 audio_format = 'mp3'
 new_audio_format = 'wav'
 AudioSegment.from_file(audio_data+'.'+audio_format).export(audio_data+'.wav', format='wav')
-arr, sr = librosa.load('sa.wav', sr=44100)
+arr, sr = librosa.load('test_audio_2.wav', sr=44100)
 
 # Creating samples
 t = librosa.samples_to_time(arr)
