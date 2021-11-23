@@ -4,7 +4,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 from pydub import AudioSegment
 
-arr, sr = librosa.load('sa.wav', sr=44100)
+arr, sr = librosa.load('test_audio_2.wav', sr=44100)
 print('Общее количество кадров =% d, частота дискретизации =% d, продолжительность в секундах =% f'% (len (arr), sr, len (arr) / sr))
 print(arr.shape)
 samples = librosa.samples_like(arr, hop_length=1)

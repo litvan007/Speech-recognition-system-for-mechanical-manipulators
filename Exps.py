@@ -7,7 +7,7 @@ from scipy.signal import spectrogram
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 
-arr, sr = librosa.load('sa.wav', sr=22050)
+arr, sr = librosa.load('test_audio_2.wav', sr=22050)
 
 t = len(arr)/sr
 # X = librosa.stft(arr, n_fft=512, hop_length=512)
