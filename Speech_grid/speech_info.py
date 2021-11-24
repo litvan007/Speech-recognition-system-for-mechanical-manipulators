@@ -53,17 +53,17 @@ class sp_info:
         frame_edge = int(self.frame_length / dt)
 
         frames_matrix = np.array([])
-        for i in range(0, n - 2 * step, step):  # наскоки для последовательности фреймов
-            if i * dt > 10 ** 3 and flag == False: # это точнее и по времени также, чем просто self.frames_length / self.time
+        for i in np.arange(0, n - 3 * step, step):  # наскоки для последовательности фреймов (Теряется 3 фрейма)
+            if i * dt > 10 ** 3 and flag == False:  # это точнее и по времени также, чем просто self.frames_length / self.time
                 self.ind_noise = int(i / step)
                 flag = True
 
-            temp = np.array([self.arr[j] for j in range(i, i + frame_edge, 1)])  # фрейм
+            temp = np.array([self.arr[j] for j in np.arange(i, i + frame_edge, 1)])  # фрейм
             frames_matrix = np.append(frames_matrix, temp, axis=0)
 
         frames_matrix = np.reshape(frames_matrix, (
-            int((n - 2 * step) / step) + 1, frame_edge))  # reshape матрицы, чтобы на каждом значении были фремйм
-        self.frames_length = int((n - 2 * step) / step) + 1  # всего фреймов
+            int((n - 3 * step) / step) + 1, frame_edge))  # reshape матрицы, чтобы на каждом значении были фремйм
+        self.frames_length = int((n - 3 * step) / step) + 1  # всего фреймов
         # FIXME Если вдруг не работает split слов, то проблема здесь
 
         logger.info("Frames was created for {}s".format(time.time() - t))

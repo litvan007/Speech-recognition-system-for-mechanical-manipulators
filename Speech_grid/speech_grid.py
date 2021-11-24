@@ -18,7 +18,7 @@ class sp_grid(sp_info):
         super().__init__(_arr, _sr, _frames_length, _hop_length)
         self.T = 0
         self.R = 0
-        self.speech_range = 15
+        self.speech_range = 15  # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
         self.noise_range = 5
 
     def speech_split_with_zero_crossing_rate(self):
