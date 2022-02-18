@@ -1,5 +1,6 @@
 from Speech_grid.speech_grid import sp_grid
 
+
 class on_flow_obu:
     def __init__(self):
         # Считыввать входящий голос on air. Видмимо по фреймно
