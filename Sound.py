@@ -6,10 +6,10 @@ import librosa.display
 from pydub import AudioSegment
 
 # Converting
-audio_data = "./sa"
-audio_format = 'mp3'
-new_audio_format = 'wav'
-AudioSegment.from_file(audio_data+'.'+audio_format).export(audio_data+'.wav', format='wav')
+# # audio_data = "./test_audio_2"
+# # audio_format = 'mp3'
+# # new_audio_format = 'wav'
+# AudioSegment.from_file(audio_data+'.'+audio_format).export(audio_data+'.wav', format='wav')
 arr, sr = librosa.load('test_audio_2.wav', sr=44100)
 
 # Creating samples

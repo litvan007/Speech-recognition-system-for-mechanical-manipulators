@@ -3,9 +3,9 @@ import logging
 import librosa.display
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.fft import fft, fftfreq
+from cycler import cycler
+from celluloid import Camera
 from pydub import AudioSegment
-from scipy.stats.mstats import gmean
 
 from Speech_grid.speech_info import sp_info
 
@@ -14,170 +14,219 @@ logger = logging.getLogger(__name__)
 
 
 class sp_grid(sp_info):
-    def __init__(self, _arr, _sr, _frames_length, _hop_length):
-        super().__init__(_arr, _sr, _frames_length, _hop_length)
+    # def __init__(self, _arr, _sr, _frames_length, _hop_length):
+    def __init__(self, *args):
+        super().__init__(*args)
         self.T = 0
         self.R = 0
-        self.speech_range = 15  # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
+        self.speech_range = 30  # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
         self.noise_range = 5
+        self.Mark = {}
+        self.Noise = set()
 
+        self.e = None
+        self.z = None
+        self.n = None
+        self.ind_split = None
+        self.flag = False
+        self.words_flag = False
+
+        self.words_time = np.array([np.array([0, 0])])
+        self.word_time = np.array([])
+
+        self.fig, self.ax = plt.subplots(figsize=(15, 10))
+        self.ax.set_prop_cycle(cycler('color', ['#1e73ad']))
+        self.camera = Camera(self.fig)
+
+    # On flow
+    def speech_split_zc_onflow(self, chunk, num, isEnd):
+        if isEnd:
+            animation = self.camera.animate(interval=25, repeat=True,
+                                            repeat_delay=500)
+            animation.save('../onflow_graphs_answers/On_flow_VAD_zero_cross_of_'+self.name+'.mp4')
+            return 0
+
+        self.frames_onflow_create(chunk, num)
+        self.ax = librosa.display.waveplot(self.arr, self.sr)
+        self.fig.suptitle('On flow VAD splitting method with zero cross rate', x=0.5, y=0.91)
+
+        # Algorithm
+        if num != 1 and self.flag == False and self.frames_matrix.shape[0] >= self.ind_noise_test:
+            self.n = self.frames_matrix.shape[0]
+            self.Mark = {frame: 0 for frame in np.arange(self.ind_noise_test)}
+            self.Noise = set([i for i in np.arange(self.ind_noise_test)])  # номер фреймов содержащие только шум
+
+            self.e = self.__e_edge(self.Noise)
+            self.z = self.__z_edge(self.Noise)
+            self.ind_split = self.ind_noise_test
+            self.flag = True
+
+        if self.flag and self.frames_matrix.shape[0] > self.ind_noise_test:
+            self.n = self.frames_matrix.shape[0]
+            for m in np.arange(self.ind_split, self.n, 1):
+                if self.frames_energy(self.frames_matrix[m]) < self.e:
+                    self.Mark = self.__Notice(0, self.Mark, m)
+                    self.Noise.add(m)
+                    self.e = self.__e_edge(self.Noise)
+                    # z = self.__z_edge(Noise)
+
+                else:
+                    if self.frames_rootmeansquare(self.frames_matrix[m]) \
+                            / self.frames_zero(
+                        self.frames_matrix[m]) > self.z:  # Можно просто сравнивать zero cross с z, но точность меньше
+                        self.Mark = self.__Notice(1, self.Mark, m)
+
+                    else:
+                        self.Mark = self.__Notice(2, self.Mark, m)
+                        # Noise.add(m)
+                        # z = self.__z_edge(Noise)
+            self.ind_split = self.n
+
+        for t in self.words_time[1:]:
+            self.ax = plt.vlines(t[0], -1, 1, colors='g', linewidth=2)
+            self.ax = plt.vlines(t[1], -1, 1, colors='r', linewidth=2)
+        self.camera.snap()
+
+    # Static
     def speech_split_with_zero_crossing_rate(self):
-        n = self.frames.shape[0]
+        n = self.frames_matrix.shape[0]
 
-        Mark = {frame: 0 for frame in np.arange(self.ind_noise_test)}  # FIXME добавить вариацию времени входной калибровки
+        self.Mark = {frame: 0 for frame in
+                np.arange(self.ind_noise_test)}  # FIXME добавить вариацию времени входной калибровки
         Noise = set([i for i in np.arange(self.ind_noise_test)])  # номер фреймов содержащие только шум
         e = self.__e_edge(Noise)
         z = self.__z_edge(Noise)
 
         for m in np.arange(self.ind_noise_test, n, 1):
-            if self.frames_energy(self.frames[m]) < e:
-                Mark = self.__add_edges(0, Mark, m)
+            if self.frames_energy(self.frames_matrix[m]) < e:
+                self.Mark = self.__add_edges(0, self.Mark, m)
                 Noise.add(m)
                 e = self.__e_edge(Noise)
                 # z = self.__z_edge(Noise)
             else:
-                if self.frames_rootmeansquare(self.frames[m])/self.frames_zero(self.frames[m]) > z: # Можно просто сравнивать zero cross с z, но точность меньше
-                    Mark = self.__add_edges(1, Mark, m)
+                if self.frames_rootmeansquare(self.frames_matrix[m]) / self.frames_zero(
+                        self.frames_matrix[m]) > z:  # Можно просто сравнивать zero cross с z, но точность меньше
+                    self.Mark = self.__add_edges(1, self.Mark, m)
                 else:
-                    Mark = self.__add_edges(2, Mark, m)
+                    self.Mark = self.__add_edges(2, self.Mark, m)
                     # Noise.add(m)
                     # z = self.__z_edge(Noise)
-        return Mark
+        return self.Mark
 
-    def speech_split_with_short_term_feature(self):
-        energy_PrimTresh = 40
-        F_PrimTresh = 185
-        SF_PrimTresh = 5
-        n = self.frames.shape[0]
-        energy = np.array([])
-        F = np.array([])
-        SFM = np.array([])
-        Mark = {}
-
-        for m in np.arange(self.ind_noise_test):
-            yf = fft(self.frames[m])
-            xf = fftfreq(np.size(self.frames[m]), 1/self.sr)
-
-            energy = np.append(energy, self.frames_energy(self.frames[m]))
-            F = np.append(F, xf[np.argmax(yf)])
-            SFM = np.append(SFM, 10*np.log(gmean(yf)/np.mean(yf)+1e2))
-            temp = {m : 0}
-            Mark.update(temp)
-
-        Min_E, Min_F, Min_SF = np.min(energy), np.min(F), np.min(SFM)
-        Tresh_E = energy_PrimTresh * np.log(Min_E+1e2)
-        Tresh_F = F_PrimTresh
-        Tresh_SF = SF_PrimTresh
-        Silence_count = 0
-        Speech_count = 0
-        for m in np.arange(self.ind_noise_test, n, 1):
-            yf = fft(self.frames[m])
-            xf = fftfreq(np.size(self.frames[m]), 1/self.sr)
-            E = self.frames_energy(self.frames[m])
-
-            counter = 0
-            if E - Min_E >= Tresh_E:
-                counter += 1
-            if xf[np.argmax(yf)] - Min_F >= Tresh_F:
-                counter += 1
-            if 10*np.log10(gmean(yf)/np.mean(yf)+1e10) - Min_SF >= Tresh_SF:
-                counter += 1
-
-            if counter > 1:
-                Speech_count += 1
-            else:
-                Silence_count += 1
-                Min_E = ((Silence_count * Min_E) + E) / (Silence_count + 1)
-
-            if Silence_count >= 10:
-                for i in range(10):
-                    Mark[m - i] = 0
-                Speech_count = 0
-            if Speech_count >= 5:
-                for i in range(5):
-                    Mark[m - i] = 1
-                Silence_count = 0
-
-        Tresh_E = energy_PrimTresh * np.log(Min_E)
-        return Mark
-
-    def speech_split_with_entropy(self): # может чаще ошибаться
-        if self.time < 1:
+    # Static
+    def speech_split_with_entropy(self):  # может чаще ошибаться
+        if self.time_old < 1:
             return {}
         else:
-            n = self.frames.shape[0]
+            n = self.frames_matrix.shape[0]
 
-            Mark = {frame: 0 for frame in range(self.ind_noise_test)}  # FIXME добавить вариацию времени входной калибровки
-            Noise = set([i for i in range(self.ind_noise_test)])  # номер фреймов содержащие только шум
+            self.Mark = {frame: 0 for frame in
+                    np.arange(self.ind_noise_test)}  # FIXME добавить вариацию времени входной калибровки
+            Noise = set([i for i in np.arange(self.ind_noise_test)])  # номер фреймов содержащие только шум
             e, h = self.__e_edge(Noise), self.__h_edge(Noise)
 
         for m in np.arange(self.ind_noise_test, n, 1):
-            if self.frames_energy(self.frames[m]) < e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
-                Mark = self.__add_edges(0, Mark, m)
+            if self.frames_energy(self.frames_matrix[
+                                      m]) < e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
+                self.Mark = self.__add_edges(0, self.Mark, m)
                 Noise.add(m)
                 e = self.__e_edge(Noise)
                 # h = self.__h_edge(Noise)
             else:
-                if self.frames_entropy(self.frames[m]) < h:
-                    Mark = self.__add_edges(1, Mark, m)
+                if self.frames_entropy(self.frames_matrix[m]) < h:
+                    self.Mark = self.__add_edges(1, self.Mark, m)
                 else:
-                    Mark = self.__add_edges(2, Mark, m)
+                    self.Mark = self.__add_edges(2, self.Mark, m)
                     Noise.add(m)
                     h = self.__h_edge(Noise)
-        return Mark
+        return self.Mark
 
     def __h_edge(self, Noise):
-        temp_h = np.array([self.frames_entropy(self.frames[m]) for m in Noise])
+        temp_h = np.array([self.frames_entropy(self.frames_matrix[m]) for m in Noise])
         Mh = np.mean(temp_h)
         Dh = np.var(temp_h)
         return Mh + np.sqrt(Dh)
 
     def __e_edge(self, Noise):
-        temp_e = np.array([self.frames_energy(self.frames[m]) for m in Noise])
+        temp_e = np.array([self.frames_energy(self.frames_matrix[m]) for m in Noise])
         Me = np.mean(temp_e)
         return Me
 
     def __z_edge(self, Noise):
-        temp_z = np.array([self.frames_zero(self.frames[m]) for m in Noise])
-        temp_re = np.array([self.frames_rootmeansquare(self.frames[m]) for m in Noise])
+        temp_z = np.array([self.frames_zero(self.frames_matrix[m]) for m in Noise])
+        temp_re = np.array([self.frames_rootmeansquare(self.frames_matrix[m]) for m in Noise])
         Mz = np.mean(temp_z)
         Dz = np.var(temp_z)
         Erms = np.mean(temp_re)
-        return Erms/Mz
+        return Erms / Mz
+
+    def __Notice(self, num, Mark, m):
+        if num == 0:
+            self.T = 0
+            temp = {m: 0}
+            Mark.update(temp)
+
+            if self.words_flag:
+                self.word_time = np.append(self.word_time, m / 100)
+                self.words_time = np.append(self.words_time, [self.word_time], axis=0)
+                self.word_time = np.array([])
+                self.words_flag = False
+
+        if num == 1 and self.T < self.speech_range:
+            self.T += 1
+            temp = {m: 0}
+            Mark.update(temp)
+        elif num == 1 and self.T == self.speech_range:
+            for i in np.arange(m - self.T + 1, m - self.T + self.speech_range, 1):
+                Mark[i] = 1
+            self.T += 1
+
+            self.word_time = np.append(self.word_time, (m - self.T + 1) / 100)
+            self.words_flag = True
+        elif num == 1 and self.T > self.speech_range:
+            self.R = 0
+            # self.T += 1
+            temp = {m: 1}
+            Mark.update(temp)
+
+        if num == 2:
+            temp = {m: 2}
+            Mark.update(temp)
+        return Mark
 
     def __add_edges(self, num, Mark, m):
         if num == 0:
             self.T = 0
-            temp = {m : 0}
+            temp = {m: 0}
             Mark.update(temp)
 
         if num == 1 and self.T < self.speech_range:
             self.T += 1
         elif num == 1 and self.T == self.speech_range:
             for i in np.arange(m - self.T + 1, m - self.T + self.speech_range, 1):
-                temp = {i : 1}
+                temp = {i: 1}
                 Mark.update(temp)
             self.T += 1
         elif num == 1 and self.T > self.speech_range:
             self.R = 0
-            temp = {m : 1}
+            temp = {m: 1}
             Mark.update(temp)
 
         if num == 2:
-            temp = {m : 2}
+            temp = {m: 2}
             Mark.update(temp)
         return Mark
 
-    def find_words_edges(self, mark):
+    def find_words_edges(self):
         lst = np.array([[0, 0]])
         flag = False
         temp = []
-        for k, v in mark.items():
+        for k, v in self.Mark.items():
             if v == 1 and flag == False:
-                temp.append(k/100)
+                temp.append(k / 100)
                 flag = True
             if v == 0 and flag == True:
-                temp.append(k/100)
+                temp.append(k / 100)
                 flag = False
                 lst = np.append(lst, [temp], axis=0)
                 temp = []
@@ -191,12 +240,15 @@ class sp_grid(sp_info):
         for edges in words_grid:
             plt.vlines(edges[0], -1, 1, colors='g', linewidth=2)
             plt.vlines(edges[1], -1, 1, colors='r', linewidth=2)
-        plt.savefig('../graphs_answers/'+title + '.png')
+            plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05, 'Слово')
+        plt.legend(['Sound', 'Start', 'End'])
+        plt.savefig('../graphs_answers/' + title + '.png')
         plt.show()
 
     def export_words(self, words_grid, title):
         sound_file = AudioSegment.from_file('../test_audio_3.m4a')
         for x, y in words_grid:
-            new_file = self.arr_original[int(x*self.sr):int(y*self.sr)]
-            song = AudioSegment(new_file.tobytes(), frame_rate=sound_file.frame_rate,sample_width=sound_file.sample_width,channels=1)
+            new_file = self.arr_original[int(x * self.sr):int(y * self.sr)]
+            song = AudioSegment(new_file.tobytes(), frame_rate=sound_file.frame_rate,
+                                sample_width=sound_file.sample_width, channels=1)
             song.export('../sounds_answers/' + title + ': ' + str(x) + ' - ' + str(y) + ".mp3", format='mp3')
