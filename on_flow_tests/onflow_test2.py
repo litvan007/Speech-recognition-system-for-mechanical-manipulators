@@ -23,15 +23,32 @@ if __name__ == '__main__':
     chunk = int(frame_length / dt)
 
     sound_split = np.array([])
-    sound = sp_grid(sr, frame_length, hop_length, name)
+    sound_zc = sp_grid(sr, frame_length, hop_length, name)
+    sound_entropy = sp_grid(sr, frame_length, hop_length, name)
+
 
     # Voice feeding
-    logger.info('Start Telling')
+    logger.info('Start Telling for ZC')
+
+    sound_zc = sp_grid(sr, frame_length, hop_length, name)
     i = 0
     while arr.size - i*chunk > 0:
         sound_split = arr[i * chunk:(i + 1) * chunk]
-        sound.speech_split_zc_onflow(sound_split, i + 1, False)
+        sound_zc.speech_split_zc_onflow(sound_split, i + 1, False)
         i += 1
     # Ending
-    logger.info('End Telling')
-    sound.speech_split_zc_onflow(sound_split, 1, True)
+    logger.info('End Telling for ZC')
+    sound_zc.speech_split_zc_onflow(sound_split, 1, True)
+    del sound_zc
+
+    logger.info('Start Telling for Entropy')
+    sound_entropy = sp_grid(sr, frame_length, hop_length, name)
+    i = 0
+    while arr.size - i*chunk > 0:
+        sound_split = arr[i * chunk:(i + 1) * chunk]
+        sound_entropy.speech_split_entropy_onflow(sound_split, i + 1, False)
+        i += 1
+    # Ending
+    logger.info('End Telling for Entropy')
+    sound_entropy.speech_split_entropy_onflow(sound_split, 1, True)
+    del sound_entropy
