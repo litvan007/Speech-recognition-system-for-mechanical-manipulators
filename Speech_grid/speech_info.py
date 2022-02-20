@@ -16,8 +16,7 @@ class sp_info:
     # def __init__(self, _arr, _sr, _frame_length, _hop_length):
     def __init__(self, *args):
         # static
-        if isinstance(args[3], str) == False:
-        # if type(args[4]) != 'str':
+        if not isinstance(args[3], str):
             self.arr_original = args[0]
             # self.arr = args[0] / max(abs(args[0]))  # нормализация значений массива
             self.arr = args[0]
@@ -60,6 +59,8 @@ class sp_info:
 
             self.ind_noise_test = 65
             self.Voice = []
+    def __del__(self):
+        logger.info("...")
 
     def frames_onflow_create(self, chunk, num):
         # chunk = chunk / np.max(chunk)
@@ -152,8 +153,7 @@ class sp_info:
         return np.sqrt(np.mean(np.square(frame)))
 
     def frames_zero(self, frame):
-        sm = 1e10
-        N = frame.size
+        sm = 1e-10
         for m in np.arange(1):
             sm += np.abs(np.sign(frame[m]) - np.sign(frame[m - 1]))
         return 1 / 2 * sm
