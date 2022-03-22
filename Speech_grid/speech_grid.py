@@ -197,7 +197,6 @@ class sp_grid(sp_info):
         flag = False
         print(IMX, IMN, ITU, ITL, IZCT)
 
-        # for m in np.arange(t, n, 1):
         m = self.ind_noise_test
         while m < n:
             print(m, ' -- ', self.frames_energy_sq(self.frames_matrix[m]))
@@ -229,10 +228,12 @@ class sp_grid(sp_info):
                     if int > 25:
                         break
                 temp.append(N/100)
-                self.sp_edges = np.append(self.sp_edges[1:], [temp], axis=0)
+                self.sp_edges = np.append(self.sp_edges, [temp], axis=0)
                 temp = []
                 flag = not flag
+                m = N
             m += 1
+        self.sp_edges = self.sp_edges[1:]
 
     def __h_edge(self, Noise):
         temp_h = np.array([self.frames_entropy(self.frames_matrix[m]) for m in Noise])
