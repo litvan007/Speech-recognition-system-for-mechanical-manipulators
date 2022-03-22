@@ -22,6 +22,8 @@ class sp_grid(sp_info):
         self.speech_range = 30  # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
         self.noise_range = 5
 
+        self.sp_edges = np.array([[0, 0]])
+
         self.Mark = {}
         self.Noise = set()
 
@@ -69,7 +71,7 @@ class sp_grid(sp_info):
         if self.flag and self.frames_matrix.shape[0] > self.ind_noise_test:
             self.n = self.frames_matrix.shape[0]
             for m in np.arange(self.ind_split, self.n, 1):
-                if self.frames_energy(self.frames_matrix[m]) < self.e:
+                if self.frames_energy_var(self.frames_matrix[m]) < self.e:
                     self.Mark = self.__Notice(0, self.Mark, m)
                     self.Noise.add(m)
                     self.e = self.__e_edge(self.Noise)
@@ -101,7 +103,7 @@ class sp_grid(sp_info):
         e, z = self.__e_edge(self.Noise), self.__z_edge(self.Noise)
 
         for m in np.arange(self.ind_noise_test, n, 1):
-            if self.frames_energy(self.frames_matrix[m]) < e:
+            if self.frames_energy_sq(self.frames_matrix[m]) < e:
                 self.Mark = self.__add_edges(0, self.Mark, m)
                 self.Noise.add(m)
                 e = self.__e_edge(self.Noise)
@@ -142,7 +144,7 @@ class sp_grid(sp_info):
         if self.flag and self.frames_matrix.shape[0] > self.ind_noise_test:
             self.n = self.frames_matrix.shape[0]
             for m in np.arange(self.ind_split, self.n, 1):
-                if self.frames_energy(self.frames_matrix[m]) < self.e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
+                if self.frames_energy_var(self.frames_matrix[m]) < self.e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
                     self.Mark = self.__Notice(0, self.Mark, m)
                     self.Noise.add(m)
                     self.e = self.__e_edge(self.Noise)
@@ -171,7 +173,7 @@ class sp_grid(sp_info):
         e, h = self.__e_edge(self.Noise), self.__h_edge(self.Noise)
 
         for m in np.arange(self.ind_noise_test, n, 1):
-            if self.frames_energy(self.frames_matrix[m]) < e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
+            if self.frames_energy_sq(self.frames_matrix[m]) < e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
                 self.Mark = self.__add_edges(0, self.Mark, m)
                 self.Noise.add(m)
                 e = self.__e_edge(self.Noise)
@@ -185,6 +187,53 @@ class sp_grid(sp_info):
                     h = self.__h_edge(self.Noise)
         return self.Mark
 
+    def speech_split_with_zrc(self):
+        n = self.frames_matrix.shape[0]
+        temp = []
+        IMX, IMN = self.__IMX(), self.__IMN()
+        ITU = self.__ITU(IMX, IMN)
+        ITL = ITU/5.0
+        IZCT = self.__IZCT()
+        flag = False
+        print(IMX, IMN, ITU, ITL, IZCT)
+
+        # for m in np.arange(t, n, 1):
+        m = self.ind_noise_test
+        while m < n:
+            print(m, ' -- ', self.frames_energy_sq(self.frames_matrix[m]))
+            print('-->', ITU)
+            if self.frames_energy_sq(self.frames_matrix[m]) > ITU and not flag:
+                N = m
+                int = 0
+                # go left
+                while self.frames_energy_sq(self.frames_matrix[N]) > ITL:
+                    N -= 1
+                while self.frames_zero(self.frames_matrix[N]) > IZCT:
+                    int += 1
+                    if 3 < int <= 25:
+                        N -= 1
+                    if int > 25:
+                        break
+                temp.append(N/100)
+                flag = not flag
+
+            if self.frames_energy_sq(self.frames_matrix[m]) <= ITU and flag:
+                N = m
+                int = 0
+                while self.frames_energy_sq(self.frames_matrix[N]) > ITL:
+                    N += 1
+                while self.frames_zero(self.frames_matrix[N]) > IZCT:
+                    int += 1
+                    if 3 < int <= 25:
+                        N += 1
+                    if int > 25:
+                        break
+                temp.append(N/100)
+                self.sp_edges = np.append(self.sp_edges[1:], [temp], axis=0)
+                temp = []
+                flag = not flag
+            m += 1
+
     def __h_edge(self, Noise):
         temp_h = np.array([self.frames_entropy(self.frames_matrix[m]) for m in Noise])
         Mh = np.mean(temp_h)
@@ -192,9 +241,28 @@ class sp_grid(sp_info):
         return Mh + np.sqrt(Dh)
 
     def __e_edge(self, Noise):
-        temp_e = np.array([self.frames_energy(self.frames_matrix[m]) for m in Noise])
+        temp_e = np.array([self.frames_energy_sq(self.frames_matrix[m]) for m in Noise])
         Me = np.mean(temp_e)
         return Me
+
+    def __IMN(self):
+        temp_e = self.frames_matrix[:self.ind_noise_test]
+        return np.min(self.frames_energy_sq(temp_e))
+
+    def __IMX(self):
+        temp_e = self.frames_matrix[:self.ind_noise_test]
+        return np.max(self.frames_energy_sq(temp_e))
+
+    def __ITU(self, IMX, IMN):
+        I1 = 0.03*(IMX-IMN) + IMN
+        I2 = 4*IMN
+        ITL = min(I1, I2)
+        return 5*ITL
+
+    def __IZCT(self):
+        M = np.mean(self.frames_matrix[:self.ind_noise_test])
+        S = np.std(self.frames_matrix[:self.ind_noise_test])
+        return min(np.float64(0.25), M + 2*S)
 
     def __z_edge(self, Noise):
         temp_z = np.array([self.frames_zero(self.frames_matrix[m]) for m in Noise])
@@ -284,9 +352,30 @@ class sp_grid(sp_info):
         for edges in words_grid:
             plt.vlines(edges[0], -1, 1, colors='g', linewidth=2)
             plt.vlines(edges[1], -1, 1, colors='r', linewidth=2)
-            plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05, 'Слово')
+            # plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05, 'Слово')
         plt.legend(['Sound', 'Start', 'End'])
         plt.savefig('../graphs_answers/' + title + '.png')
+        plt.show()
+
+    def plot_voice_range_two(self, words_grid_1, words_grid_2, title_1, title_2):
+        plt.figure(figsize=(35, 13))
+        plt.subplot(1, 2, 1)
+        plt.title(title_1)
+        librosa.display.waveplot(self.arr, sr=self.sr)
+        for edges in words_grid_1:
+            plt.vlines(edges[0], -1, 1, colors='black', linewidth=2, linestyles='dashed')
+            plt.vlines(edges[1], -1, 1, colors='black', linewidth=2, linestyles='dashed')
+
+        plt.legend(['Сигнал', 'Границы речи'])
+        plt.subplot(1, 2, 2)
+        plt.title(title_2)
+        librosa.display.waveplot(self.arr, sr=self.sr)
+        for edges in words_grid_2:
+            plt.vlines(edges[0], -1, 1, colors='black', linewidth=2, linestyles='dashed')
+            plt.vlines(edges[1], -1, 1, colors='black', linewidth=2, linestyles='dashed')
+
+        plt.legend(['Сигнал', 'Границы речи'])
+        plt.savefig('./' + 'fig_lom' + '.png')
         plt.show()
 
     def export_words(self, words_grid, title):

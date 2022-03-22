@@ -33,8 +33,12 @@ class sp_info:
             self.frames_length = None
             self.frames_time = None
 
-            self.ind_noise_test = 65
+            self.ind_noise_test = 50
             self.Voice = []
+
+            if len(args) == 5 and isinstance(args[4], float):
+                w = np.sqrt(np.var(self.arr)/args[4])*np.random.normal(0, 1, self.arr.size)
+                self.arr += w
 
             logger.info(
                 "\nSample's count: {count}\nFrequency of discretization: {freq}\nSound time: {time}\ndelta t of sample: {dt}"
@@ -146,8 +150,11 @@ class sp_info:
 
         return -sm
 
-    def frames_energy(self, frame):
+    def frames_energy_var(self, frame):
         return np.var(frame)  # biased variance estimate
+
+    def frames_energy_sq(self, frame):
+        return np.sum(np.square(frame))
 
     def frames_rootmeansquare(self, frame):
         return np.sqrt(np.mean(np.square(frame)))
@@ -155,8 +162,8 @@ class sp_info:
     def frames_zero(self, frame):
         sm = 1e-10
         for m in np.arange(1):
-            sm += np.abs(np.sign(frame[m]) - np.sign(frame[m - 1]))
-        return 1 / 2 * sm
+            sm += np.sum(np.abs(np.sign(frame[m]) - np.sign(frame[m - 1])))
+        return 1 /(2*self.frames_matrix.shape[0]) * sm
 
     def frames_SFM(self, frame):
         return 10 * np.log10(self.G / self.A)
