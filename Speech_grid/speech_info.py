@@ -33,11 +33,13 @@ class sp_info:
             self.frames_length = None
             self.frames_time = None
 
-            self.ind_noise_test = 50
+            self.ind_noise_test = 65
             self.Voice = []
+            self.file_name = args[4]
+            self.words_names = []
 
-            if len(args) == 5 and isinstance(args[4], float):
-                w = np.sqrt(np.var(self.arr)/args[4])*np.random.normal(0, 1, self.arr.size)
+            if len(args) == 6 and isinstance(args[5], float):
+                w = np.sqrt(np.var(self.arr)/args[5])*np.random.normal(0, 1, self.arr.size)
                 self.arr += w
 
             logger.info(
@@ -116,6 +118,7 @@ class sp_info:
         logger.info("Frames was created for {}s".format(time.time() - t))
 
         frames_matrix = frames_matrix.astype('float64')
+        print(frames_matrix.shape)
         return frames_matrix
 
     def counts_frames(self, frame, l=9):

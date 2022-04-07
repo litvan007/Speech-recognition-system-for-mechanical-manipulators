@@ -19,8 +19,11 @@ class sp_grid(sp_info):
         super().__init__(*args)
         self.T = 0
         self.R = 0
-        self.speech_range = 30  # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
+        self.speech_range = 20 # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
         self.noise_range = 5
+
+        self.right_indent = 1e-1
+        self.left_indent = 1e-1
 
         self.sp_edges = np.array([[0, 0]])
 
@@ -199,20 +202,22 @@ class sp_grid(sp_info):
 
         m = self.ind_noise_test
         while m < n:
-            print(m, ' -- ', self.frames_energy_sq(self.frames_matrix[m]))
-            print('-->', ITU)
+            # print(m, ' -- ', self.frames_energy_sq(self.frames_matrix[m]))
+            # print('-->', ITU)
             if self.frames_energy_sq(self.frames_matrix[m]) > ITU and not flag:
                 N = m
                 int = 0
                 # go left
                 while self.frames_energy_sq(self.frames_matrix[N]) > ITL:
                     N -= 1
+                print(self.frames_zero(self.frames_matrix[N]), IZCT, '<---', N, m)
                 while self.frames_zero(self.frames_matrix[N]) > IZCT:
                     int += 1
                     if 3 < int <= 25:
                         N -= 1
                     if int > 25:
                         break
+                print('Here')
                 temp.append(N/100)
                 flag = not flag
 
@@ -346,14 +351,16 @@ class sp_grid(sp_info):
         lst = lst[1:]
         return lst
 
-    def plot_voice_range(self, words_grid, title):
+    def plot_voice_range(self, words_grid, title, words):
         plt.figure(figsize=(15, 10))
         plt.title(title)
         librosa.display.waveplot(self.arr, sr=self.sr)
+        i = 0
         for edges in words_grid:
             plt.vlines(edges[0], -1, 1, colors='g', linewidth=2)
             plt.vlines(edges[1], -1, 1, colors='r', linewidth=2)
-            # plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05, 'Слово')
+            plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05, words[i])
+            i += 1
         plt.legend(['Sound', 'Start', 'End'])
         plt.savefig('../graphs_answers/' + title + '.png')
         plt.show()
@@ -380,9 +387,12 @@ class sp_grid(sp_info):
         plt.show()
 
     def export_words(self, words_grid, title):
-        sound_file = AudioSegment.from_file('../test_audio_3.m4a')
+        sound_file = AudioSegment.from_file(self.file_name)
         for x, y in words_grid:
-            new_file = self.arr_original[int(x * self.sr):int(y * self.sr)]
-            song = AudioSegment(new_file.tobytes(), frame_rate=sound_file.frame_rate,
-                                sample_width=sound_file.sample_width, channels=1)
-            song.export('../sounds_answers/' + title + ': ' + str(x) + ' - ' + str(y) + ".mp3", format='mp3')
+            # new_file = self.arr_original[int(x * self.sr):int(y * self.sr)]
+            # song = AudioSegment(new_file.tobytes(), frame_rate=sound_file.frame_rate,
+            #                     sample_width=sound_file.sample_width, channels=1)
+            name = title + ': ' + str(x) + ' - ' + str(y) + ".wav"
+            song = sound_file[(x - self.left_indent) * 1000:(y + self.right_indent) * 1000]
+            self.words_names.append(name)
+            song.export('../sounds_answers/' + name, format='wav')
