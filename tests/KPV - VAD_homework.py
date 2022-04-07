@@ -12,8 +12,8 @@ if __name__ == '__main__':
     logger.info('Work start')
     SNR_db = 20
     snr = 10.0**(SNR_db/10.0)
-    arr, sr = librosa.load('../test_audio_1.wav', sr=22050)
-    frame_length = 25
+    arr, sr = librosa.load('../test_audio_7.wav', sr=22050)
+    frame_length = 10
     hop_length = 10
 
     sound = sp_grid(arr, sr, frame_length, hop_length, snr)
