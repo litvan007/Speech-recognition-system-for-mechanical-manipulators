@@ -7,11 +7,10 @@ from cycler import cycler
 from celluloid import Camera
 from pydub import AudioSegment
 
-from Speech_grid.speech_info import sp_info
+from Speech_recognition.speech_info import sp_info
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 class sp_grid(sp_info):
     # def __init__(self, _arr, _sr, _frames_length, _hop_length):
@@ -19,7 +18,7 @@ class sp_grid(sp_info):
         super().__init__(*args)
         self.T = 0
         self.R = 0
-        self.speech_range = 20 # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
+        self.speech_range = 30 # позволяет убрать ложные срабатвания, но возможно правильный подобраный ind_noise также может помочь
         self.noise_range = 5
 
         self.right_indent = 1e-1
@@ -40,6 +39,7 @@ class sp_grid(sp_info):
 
         self.words_time = np.array([np.array([0, 0])])
         self.word_time = np.array([])
+        self.last_file = None
 
         self.fig, self.ax = plt.subplots(figsize=(15, 10))
         self.ax.set_prop_cycle(cycler('color', ['#1e73ad']))
@@ -51,7 +51,7 @@ class sp_grid(sp_info):
     # On flow
     def speech_split_zc_onflow(self, chunk, num, isEnd):
         if isEnd:
-            logger.info("Zero cross rate file create:...")
+            logger.info("Signal file create:...")
             animation = self.camera.animate(interval=25, repeat=True,
                                             repeat_delay=500)
             animation.save('../onflow_graphs_answers/On_flow_VAD_zero_cross_of_'+self.name+'.mp4')
@@ -59,7 +59,7 @@ class sp_grid(sp_info):
 
         self.frames_onflow_create(chunk, num)
         self.ax = librosa.display.waveplot(self.arr, self.sr)
-        self.fig.suptitle('On flow VAD splitting method with zero cross rate', x=0.5, y=0.91)
+        self.fig.suptitle('On flow VAD splitting method with zero cross rate with sber recognition', x=0.5, y=0.91)
 
         # On flow zero cross rate algorithm
         if num != 1 and not self.flag and self.frames_matrix.shape[0] >= self.ind_noise_test:
@@ -74,7 +74,7 @@ class sp_grid(sp_info):
         if self.flag and self.frames_matrix.shape[0] > self.ind_noise_test:
             self.n = self.frames_matrix.shape[0]
             for m in np.arange(self.ind_split, self.n, 1):
-                if self.frames_energy_var(self.frames_matrix[m]) < self.e:
+                if self.frames_energy_sq(self.frames_matrix[m]) < self.e:
                     self.Mark = self.__Notice(0, self.Mark, m)
                     self.Noise.add(m)
                     self.e = self.__e_edge(self.Noise)
@@ -90,10 +90,15 @@ class sp_grid(sp_info):
                         # self.Noise.add(m)
                         # self.z = self.__z_edge(Noise)
             self.ind_split = self.n
-
+        k = 0
+        # print(self.words_time[1:].shape[0], len(self.words_names))
+        # print(self.words_time[1:], self.words_names, k)
         for t in self.words_time[1:]:
-            self.ax = plt.vlines(t[0], -1, 1, colors='g', linewidth=2)
-            self.ax = plt.vlines(t[1], -1, 1, colors='r', linewidth=2)
+            self.ax = plt.vlines(t[0], -0.5, 0.5, colors='g', linewidth=2)
+            self.ax = plt.vlines(t[1], -0.5, 0.5, colors='r', linewidth=2)
+            if self.words_time[1:].shape[0] == len(self.words_names):
+                self.ax = plt.text((t[0] + t[1])/2 - 0.1, -0.5-0.01, self.words_names[k])
+                k += 1
         self.camera.snap()
 
     # Static zero cross rate
@@ -124,7 +129,7 @@ class sp_grid(sp_info):
     # On flow
     def speech_split_entropy_onflow(self, chunk, num, isEnd):
         if isEnd:
-            logger.info("Entropy file create:...")
+            logger.info("Signal file create:...")
             animation = self.camera.animate(interval=25, repeat=True,
                                             repeat_delay=500)
             animation.save('../onflow_graphs_answers/On_flow_VAD_entropy_of_'+self.name+'.mp4')
@@ -132,7 +137,7 @@ class sp_grid(sp_info):
 
         self.frames_onflow_create(chunk, num)
         self.ax = librosa.display.waveplot(self.arr, self.sr)
-        self.fig.suptitle('On flow VAD splitting method with entropy', x=0.5, y=0.91)
+        self.fig.suptitle('On flow VAD splitting method with entropy with sber recognition', x=0.5, y=0.91)
 
         # On flow entropy algorithm
         if num != 1 and not self.flag and self.frames_matrix.shape[0] >= self.ind_noise_test:
@@ -147,7 +152,7 @@ class sp_grid(sp_info):
         if self.flag and self.frames_matrix.shape[0] > self.ind_noise_test:
             self.n = self.frames_matrix.shape[0]
             for m in np.arange(self.ind_split, self.n, 1):
-                if self.frames_energy_var(self.frames_matrix[m]) < self.e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
+                if self.frames_energy_sq(self.frames_matrix[m]) < self.e:  # FIXME подумать над тем, чтобы делать пересчитывание только в том случае, если меняется систематический шум
                     self.Mark = self.__Notice(0, self.Mark, m)
                     self.Noise.add(m)
                     self.e = self.__e_edge(self.Noise)
@@ -161,9 +166,15 @@ class sp_grid(sp_info):
                         self.h = self.__h_edge(self.Noise)
             self.ind_split = self.n
 
+        k = 0
+        print(self.words_time[1:].shape[0], len(self.words_names))
+        print(self.words_time[1:], self.words_names, k)
         for t in self.words_time[1:]:
-            self.ax = plt.vlines(t[0], -1, 1, colors='g', linewidth=2)
-            self.ax = plt.vlines(t[1], -1, 1, colors='r', linewidth=2)
+            self.ax = plt.vlines(t[0], -0.5, 0.5, colors='g', linewidth=2)
+            self.ax = plt.vlines(t[1], -max(self.arr), max(self.arr), colors='r', linewidth=2)
+            if self.words_time[1:].shape[0] == len(self.words_names):
+                self.ax = plt.text((t[0] + t[1])/2 - 0.1, -1.05, self.words_names[k])
+                k += 1
         self.camera.snap()
 
     # Static entropy
@@ -287,6 +298,7 @@ class sp_grid(sp_info):
             if self.words_flag:
                 self.word_time = np.append(self.word_time, m / 100)
                 self.words_time = np.append(self.words_time, [self.word_time], axis=0)
+                self.export_words([self.word_time], self.name.split('.')[0])
                 self.word_time = np.array([])
                 self.words_flag = False
 
@@ -360,6 +372,10 @@ class sp_grid(sp_info):
             plt.vlines(edges[0], -1, 1, colors='g', linewidth=2)
             plt.vlines(edges[1], -1, 1, colors='r', linewidth=2)
             plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05, words[i])
+            # j = 0
+            # for answer in words:
+            #     plt.text((edges[0] + edges[1]) / 2 - 0.1, -1.05 - j/2, answer[i])
+            #     j += 1
             i += 1
         plt.legend(['Sound', 'Start', 'End'])
         plt.savefig('../graphs_answers/' + title + '.png')
@@ -389,10 +405,8 @@ class sp_grid(sp_info):
     def export_words(self, words_grid, title):
         sound_file = AudioSegment.from_file(self.file_name)
         for x, y in words_grid:
-            # new_file = self.arr_original[int(x * self.sr):int(y * self.sr)]
-            # song = AudioSegment(new_file.tobytes(), frame_rate=sound_file.frame_rate,
-            #                     sample_width=sound_file.sample_width, channels=1)
-            name = title + ': ' + str(x) + ' - ' + str(y) + ".wav"
+            name = '../sounds_answers/' + title + ': ' + str(x) + ' - ' + str(y) + ".wav"
             song = sound_file[(x - self.left_indent) * 1000:(y + self.right_indent) * 1000]
-            self.words_names.append(name)
-            song.export('../sounds_answers/' + name, format='wav')
+            self.words_files.append(name)
+            self.last_file = name
+            song.export(name, format='wav')

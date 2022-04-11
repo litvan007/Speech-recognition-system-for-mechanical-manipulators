@@ -3,9 +3,9 @@ import librosa
 import logging
 import time
 
-from Speech_grid.speech_grid import sp_grid
-from Speech_grid.speech_recognition import sp_recognition
-from Speech_grid.speech_info import sp_info
+from Speech_recognition.speech_grid import sp_grid
+from Speech_recognition.speech_recognition import sp_recognition
+from Speech_recognition.speech_info import sp_info
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ if __name__ == '__main__':
 
     sound.export_words(words_grid3, title='zero_cross_test2')
 
-    transcription = sp_recognition(sound.words_names)
-    answer = transcription.transcript()
+    transcription = sp_recognition(sound.words_files)
+    answer = transcription.sber_model_transcript()
     print(answer)
 
     sound.plot_voice_range(words_grid3, title='Time of VAD splitting method with zero cross rate {:f}s with {} SNR db and recognition words (test 2)'.format(all_time, SNR_db), words=answer)

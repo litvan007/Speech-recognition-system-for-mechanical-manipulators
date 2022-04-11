@@ -1,4 +1,4 @@
-from Speech_grid.speech_grid import sp_grid
+from Speech_recognition.speech_grid import sp_grid
 
 
 class on_flow_obu:
