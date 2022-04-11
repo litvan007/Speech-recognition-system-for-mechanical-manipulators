@@ -5,9 +5,9 @@ import time
 
 from pydub import AudioSegment
 
-from Speech_grid.speech_grid import sp_grid
-from Speech_grid.speech_recognition import sp_recognition
-from Speech_grid.speech_info import sp_info
+from Speech_recognition.speech_grid import sp_grid
+from Speech_recognition.speech_recognition import sp_recognition
+from Speech_recognition.speech_info import sp_info
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,11 +30,12 @@ if __name__ == '__main__':
     words_grid3 = sound.find_words_edges()
     sound.export_words(words_grid3, title='zero_cross_test1')
 
-    transcription = sp_recognition(sound.words_names)
-    answer = transcription.transcript()
-    print(answer)
+    transcription = sp_recognition(sound.words_files)
+    answer1 = transcription.sber_model_transcript()
+    answer2 = transcription.vosk_model_transcript()
+    print(answer1, '\n', answer2)
 
-    sound.plot_voice_range(words_grid3, title='Time of VAD splitting method with zero cross rate {:f}s with {} SNR db and recognition words (test 1)'.format(all_time, SNR_db), words=answer)
+    sound.plot_voice_range(words_grid3, title='Time of VAD splitting method with zero cross rate {:f}s with {} SNR db and recognition words (test 1)'.format(all_time, SNR_db), words=[answer1, answer2])
 
 
     # t = time.time()

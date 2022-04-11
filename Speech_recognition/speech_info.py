@@ -11,11 +11,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class sp_info:
     # def __init__(self, _arr, _sr, _frame_length, _hop_length):
     def __init__(self, *args):
         # static
+        self.words_names = list()
         if not isinstance(args[3], str):
             self.arr_original = args[0]
             # self.arr = args[0] / max(abs(args[0]))  # нормализация значений массива
@@ -36,7 +36,7 @@ class sp_info:
             self.ind_noise_test = 65
             self.Voice = []
             self.file_name = args[4]
-            self.words_names = []
+            self.words_files = []
 
             if len(args) == 6 and isinstance(args[5], float):
                 w = np.sqrt(np.var(self.arr)/args[5])*np.random.normal(0, 1, self.arr.size)
@@ -54,7 +54,9 @@ class sp_info:
             self.sr = args[0]
             self.frame_length = args[1]
             self.hop_length = args[2]
-            self.name = args[3]
+            self.file_name = args[3]
+            self.name = self.file_name.split('/')[1].split('.')[0]
+            self.words_files = []
 
             self.frames_matrix = None
             self.arr = np.array([])
@@ -77,7 +79,7 @@ class sp_info:
             self.time = float(chunk.size / self.sr)
             dt = self.time * 1000 / n  # Время в ms через которое начнется следующий элумент sample
             self.step = int(self.hop_length / dt)  # tpart/time * n (перевод времени в индекс массива)
-            self.frame_edge = int(self.frame_length / dt)
+            self.frame_edge = int(self.frame_length / dt) + 1
 
             self.arr = chunk.astype('float64')
             self.frames_matrix = [self.arr]
@@ -118,7 +120,6 @@ class sp_info:
         logger.info("Frames was created for {}s".format(time.time() - t))
 
         frames_matrix = frames_matrix.astype('float64')
-        print(frames_matrix.shape)
         return frames_matrix
 
     def counts_frames(self, frame, l=9):
@@ -135,11 +136,6 @@ class sp_info:
                 if ledge <= amp <= redge:
                     count_frame[i] += 1
                     break
-
-        # plt.figure(figsize=(15, 4))
-        # plt.hist(frame, edgecolor="black", bins=l)
-        # plt.show()
-        # proposition(ampl) = count of ampl divided by length of frame
         return count_frame
 
     def frames_entropy(self, frame):
