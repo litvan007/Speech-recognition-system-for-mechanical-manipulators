@@ -2,22 +2,24 @@ import logging
 import time
 import multiprocessing as mp
 
+import librosa
 import numpy as np
 from pydub import AudioSegment
-import librosa
 from share_array.share_array import get_shared_array, make_shared_array
 from ctypes import c_char_p
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class speech_split():
-    def __init__(self, Q, W, file_name, sr, frame_length, hop_length):
+class speech_split:
+    def __init__(self, Q, W, arr, cond, file_name, sr, frame_length, hop_length):
         # Data sound input
         self.sound_file = AudioSegment.from_file(file_name)
         self.hop_length = hop_length
         self.frame_length = frame_length
         self.chunk = self.frame_length
+        self.arr = arr
         self.sr = sr
         self.temp_audio = np.array([])
         self.current_audio = np.array([])
@@ -27,6 +29,7 @@ class speech_split():
         # Data sound output
         self.Q = Q
         self.W = W
+        self.cond = cond
         self.words_files = []
 
         # Parameters for splitting
@@ -37,7 +40,7 @@ class speech_split():
         self.T = 0
         self.right_indent = 1e-1
         self.left_indent = 1e-1
-        self.e = None
+        self.flag = None
         self.z = None
         self.flag = False
         self.words_flag = False
@@ -49,6 +52,8 @@ class speech_split():
         self.speech_edges = np.array([[0, 0]])
         self.words_time = np.array([[0, 0]])
         self.word_time = np.array([])
+
+        # Data for printing
 
     def __del__(self):
         self.Q.put(None)
@@ -86,17 +91,19 @@ class speech_split():
             self.step = int(self.hop_length / dt)  # tpart/time * n (перевод времени в индекс массива)
             self.frame_edge = int(self.frame_length / dt) + 1
 
-            self.arr = chunk.astype('float64')
-            self.frames_matrix = [self.arr]
+            temp = chunk.astype('float64')
+            self.arr.append(temp[:])
+            self.frames_matrix = [temp]
             self.ind = self.step
 
         else:
-            self.arr = np.append(self.arr, chunk.astype('float64'))
-            n = self.arr.size
+            temp = chunk.astype('float64')
+            self.arr[0] = np.append(self.arr[0], temp)
+            n = self.arr[0].size
             ind = self.ind
             i = 0
             while n - self.ind - i - self.frame_edge >= 0:
-                temp = self.arr[ind:ind + self.frame_edge]
+                temp = self.arr[0][ind:ind + self.frame_edge]
                 self.frames_matrix = np.append(self.frames_matrix, [temp], axis=0)
                 ind += self.step
                 i += self.step
@@ -132,31 +139,38 @@ class speech_split():
     # Splitting by zero crossing method
     def speech_split_onflow(self, chunk, num, isEnd):
         if isEnd:
-            # logger.info("Signal file create:...")
-            # animation = self.camera.animate(interval=25
+            self.Q.put(None)
+            while True:
+                item = self.W.get()
+                print(f'{item} is word')
+                if item is None:
+                    break
+            logger.info("Signal file create:...")
+            # animation = self.camera.animate(interval=25, repeat=True,
             #                                 repeat_delay=500)
             # animation.save('../onflow_graphs_answers/On_flow_VAD_zero_cross_of_' + self.name + '.mp4')
+            self.cond.value = 2
             return 0
 
+        t = time.time()
         self.__frames_onflow_create(chunk, num)
-        # self.ax = librosa.display.waveplot(self.arr, self.sr)
-        # self.fig.suptitle('On flow VAD splitting method with zero cross rate with sber recognition', x=0.5, y=0.91)
+        self.cond.value = 1
         if num != 1 and not self.flag and self.frames_matrix.shape[0] >= self.ind_end_noise:
             self.n = self.frames_matrix.shape[0]
             self.Mark = {frame: 0 for frame in np.arange(self.ind_end_noise)}
             self.Noise = set([i for i in np.arange(self.ind_end_noise)])  # номер фреймов содержащие только шум
 
-            self.e, self.z = self.__e_edge(self.Noise), self.__z_edge(self.Noise)
+            self.flag, self.z = self.__e_edge(self.Noise), self.__z_edge(self.Noise)
             self.ind_split = self.ind_end_noise
             self.flag = True
 
         if self.flag and self.frames_matrix.shape[0] > self.ind_end_noise:
             self.n = self.frames_matrix.shape[0]
             for m in np.arange(self.ind_split, self.n, 1):
-                if self.frames_energy(self.frames_matrix[m]) < self.e:
+                if self.frames_energy(self.frames_matrix[m]) < self.flag:
                     self.__Notice(0, m)
                     self.Noise.add(m)
-                    self.e = self.__e_edge(self.Noise)
+                    self.flag = self.__e_edge(self.Noise)
                     # self.z = self.__z_edge(Noise)
                 else:
                     if self.frames_rootmeansquare(self.frames_matrix[m]) \
@@ -170,14 +184,13 @@ class speech_split():
                         # self.z = self.__z_edge(Noise)
             self.ind_split = self.n
         # k = 0
-        #     # print(self.words_time[1:].shape[0], len(self.words_names))
-        #     # print(self.words_time[1:], self.words_names, k)
         # for t in self.words_time[1:]:
         #     self.ax = plt.vlines(t[0], -0.5, 0.5, colors='g', linewidth=2)
         #     self.ax = plt.vlines(t[1], -0.5, 0.5, colors='r', linewidth=2)
-        #     if self.words_time[1:].shape[0] == len(self.words_names):
-        #         self.ax = plt.text((t[0] + t[1]) / 2 - 0.1, -0.5 - 0.01, self.words_names[k])
-        #         k += 1
+        #     # print(self.words)
+        #     # if self.words_time[1:].shape[0] == len(self.words):
+        #     #     self.ax = plt.text((t[0] + t[1]) / 2 - 0.1, -0.5 - 0.01, self.words[k])
+        #     #     k += 1
         # self.camera.snap()
 
     def __Notice(self, num, m):

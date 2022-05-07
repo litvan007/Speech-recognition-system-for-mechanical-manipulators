@@ -13,11 +13,12 @@ import nemo.collections.asr as nemo_asr
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class speech_recognition():
-    def __init__(self, Q, W):
+class speech_recognition:
+    def __init__(self, Q, W, words):
         # Data init for words recognition
         self.Q = Q
         self.W = W
+        self.words = words
 
         # Models of recognition
         self.sber_quartzNet = nemo_asr.models.EncDecCTCModel.restore_from("../content/QuartzNet15x5_golos.nemo")
@@ -31,8 +32,11 @@ class speech_recognition():
             file = self.Q.get()
             print(f'{file} is cur file')
             if file is not None:
-                self.W.put(self.sber_quartzNet.transcribe(paths2audio_files=[file], batch_size=1024))
+                word = self.sber_quartzNet.transcribe(paths2audio_files=[file], batch_size=1024)
+                self.W.put(word[0])
+                self.words.append(word[0])
             else:
+                self.W.put(None)
                 break
 
 
