@@ -8,12 +8,11 @@ from pydub import AudioSegment
 from share_array.share_array import get_shared_array, make_shared_array
 from ctypes import c_char_p
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class speech_split:
-    def __init__(self, Q, W, arr, cond, file_name, sr, frame_length, hop_length):
+    def __init__(self, Q, arr, cond, words_time, file_name, sr, frame_length, hop_length):
         # Data sound input
         self.sound_file = AudioSegment.from_file(file_name)
         self.hop_length = hop_length
@@ -28,7 +27,6 @@ class speech_split:
 
         # Data sound output
         self.Q = Q
-        self.W = W
         self.cond = cond
         self.words_files = []
 
@@ -50,10 +48,8 @@ class speech_split:
         self.Noise = set()
         self.Mark = {}
         self.speech_edges = np.array([[0, 0]])
-        self.words_time = np.array([[0, 0]])
-        self.word_time = np.array([])
-
-        # Data for printing
+        self.words_time = words_time
+        self.word_time = list()
 
     def __del__(self):
         self.Q.put(None)
@@ -140,21 +136,14 @@ class speech_split:
     def speech_split_onflow(self, chunk, num, isEnd):
         if isEnd:
             self.Q.put(None)
-            while True:
-                item = self.W.get()
-                print(f'{item} is word')
-                if item is None:
-                    break
-            logger.info("Signal file create:...")
-            # animation = self.camera.animate(interval=25, repeat=True,
-            #                                 repeat_delay=500)
-            # animation.save('../onflow_graphs_answers/On_flow_VAD_zero_cross_of_' + self.name + '.mp4')
-            self.cond.value = 2
             return 0
 
         t = time.time()
         self.__frames_onflow_create(chunk, num)
-        self.cond.value = 1
+        if self.cond.value == -2:
+            self.cond.value = 2
+        if self.cond.value == 0 or self.cond.value == -1:
+            self.cond.value = 1
         if num != 1 and not self.flag and self.frames_matrix.shape[0] >= self.ind_end_noise:
             self.n = self.frames_matrix.shape[0]
             self.Mark = {frame: 0 for frame in np.arange(self.ind_end_noise)}
@@ -171,7 +160,6 @@ class speech_split:
                     self.__Notice(0, m)
                     self.Noise.add(m)
                     self.flag = self.__e_edge(self.Noise)
-                    # self.z = self.__z_edge(Noise)
                 else:
                     if self.frames_rootmeansquare(self.frames_matrix[m]) \
                             / self.frames_zero(
@@ -180,18 +168,7 @@ class speech_split:
 
                     else:
                         self.__Notice(2, m)
-                        # self.Noise.add(m)
-                        # self.z = self.__z_edge(Noise)
             self.ind_split = self.n
-        # k = 0
-        # for t in self.words_time[1:]:
-        #     self.ax = plt.vlines(t[0], -0.5, 0.5, colors='g', linewidth=2)
-        #     self.ax = plt.vlines(t[1], -0.5, 0.5, colors='r', linewidth=2)
-        #     # print(self.words)
-        #     # if self.words_time[1:].shape[0] == len(self.words):
-        #     #     self.ax = plt.text((t[0] + t[1]) / 2 - 0.1, -0.5 - 0.01, self.words[k])
-        #     #     k += 1
-        # self.camera.snap()
 
     def __Notice(self, num, m):
         if num == 0:
@@ -200,10 +177,15 @@ class speech_split:
             self.Mark.update(temp)
 
             if self.words_flag:
-                self.word_time = np.append(self.word_time, m / 100)
-                self.words_time = np.append(self.words_time, [self.word_time], axis=0)
+                self.word_time.append(m / 100)
+                # self.words_time = np.append(self.words_time, [self.word_time], axis=0)
+                self.words_time.append(self.word_time)
+                if self.cond.value == -3:
+                    self.cond.value = 3
+                if self.cond.value == -1 or self.cond.value == -2:
+                    self.cond.value = 2
                 self.export_words([self.word_time], self.name.split('.')[0])
-                self.word_time = np.array([])
+                self.word_time = list()
                 self.words_flag = False
 
         if num == 1 and self.T < self.speech_range:
@@ -215,7 +197,7 @@ class speech_split:
                 self.Mark[i] = 1
             self.T += 1
 
-            self.word_time = np.append(self.word_time, (m - self.T + 1) / 100)
+            self.word_time.append((m - self.T + 1) / 100)
             self.words_flag = True
         elif num == 1 and self.T > self.speech_range:
             self.R = 0
@@ -235,14 +217,3 @@ class speech_split:
             self.Q.put(name)
             self.words_files.append(name)
             song.export(name, format='wav')
-
-
-
-
-
-
-
-
-
-
-
