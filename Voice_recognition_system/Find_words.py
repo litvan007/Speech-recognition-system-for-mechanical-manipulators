@@ -5,8 +5,6 @@ import multiprocessing as mp
 import librosa
 import numpy as np
 from pydub import AudioSegment
-from share_array.share_array import get_shared_array, make_shared_array
-from ctypes import c_char_p
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

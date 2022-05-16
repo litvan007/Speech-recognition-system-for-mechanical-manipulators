@@ -29,7 +29,6 @@ class speech_recognition:
     def processer(self):
         while True:
             file = self.Q.get()
-            # print(f'{file} is cur file')
             if file is not None:
                 word = self.sber_quartzNet.transcribe(paths2audio_files=[file], batch_size=1024)
                 self.words.append(word[0])
