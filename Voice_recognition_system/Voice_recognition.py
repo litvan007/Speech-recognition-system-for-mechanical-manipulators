@@ -25,8 +25,10 @@ class voice_recognition:
         self.arr = mp.Manager().list()
         self.sr = sr
 
+        # Процесс нахождения
         self.p1 = mp.Process(target=self.create_split_object, args=(self.Q, self.arr, self.cond, self.words_time, file_name, sr, frame_length, hop_length,),
                              name='Split_process')
+        # Процесс распознавания
         self.p2 = mp.Process(target=self.create_recognition_object, args=(self.Q, self.cond, self.words),
                     name='Recognition_process')
 
@@ -43,13 +45,13 @@ class voice_recognition:
         self.p2.join()
         self.p1.join()
 
+        # Сохранение анимации графика
         animation = self.camera.animate(interval=25, repeat=True,
                                     repeat_delay=500)
         animation.save('../onflow_graphs_answers/On_flow_VAD_zero_cross_of_' + self.name + '.mp4')
 
-    def __print_it(self): # Отрисовка должна работать быстрее чем нахождение гололсвой активности на фрейме
+    def __print_it(self): # Отрисовка в динамике
         while True:
-            # print(f'->>{self.words_time}\n->>{self.words}')
             if self.cond.value == 1:
                 self.cond.value = -1
                 self.fig.suptitle('On flow VAD splitting method with zero_cross with sber recognition', x=0.5, y=0.91)
