@@ -9,6 +9,7 @@ from pydub import AudioSegment
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class speech_split:
     def __init__(self, Q, arr, cond, words_time, file_name, sr, frame_length, hop_length):
         # Data sound input

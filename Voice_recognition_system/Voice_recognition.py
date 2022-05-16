@@ -15,7 +15,6 @@ from Voice_recognition_system.Recognition_words import speech_recognition
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class voice_recognition:
     def __init__(self, file_name, sr, frame_length, hop_length):
         self.Q = mp.Manager().Queue()
