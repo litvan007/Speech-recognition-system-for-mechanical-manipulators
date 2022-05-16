@@ -62,8 +62,8 @@ class voice_recognition:
                 self.fig.suptitle('On flow VAD splitting method with zero_cross with sber recognition', x=0.5, y=0.91)
                 self.ax = librosa.display.waveplot(np.array(self.arr[0]), self.sr)
                 for t in self.words_time:
-                    self.ax = plt.vlines(t[0], -max(self.arr[0]), max(self.arr[0]), colors='g', linewidth=2)
-                    self.ax = plt.vlines(t[1], -max(self.arr[0]), max(self.arr[0]), colors='r', linewidth=2)
+                    self.ax = plt.vlines(t[0], -0.5, 0.5, colors='g', linewidth=2)
+                    self.ax = plt.vlines(t[1], -0.5, 0.5, colors='r', linewidth=2)
                 self.camera.snap()
 
             if self.cond.value == 3:

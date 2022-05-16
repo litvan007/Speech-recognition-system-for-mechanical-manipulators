@@ -11,13 +11,12 @@ if __name__ == '__main__':
     sr = 22050 # частота дискретизации
     frame_length = 25 # длина фрейма в мс
     hop_length = 10 # шаг разбиения на фреймы в мс
-    file_name = '../test_audio_2.wav' # название файла
+    file_name = '../test_audio_3.m4a' # название файла
 
     system = voice_recognition(file_name, sr, frame_length, hop_length)
     system.start()
 
     # print(f'Words: {system.words}\nTime: {system.words_time}')
-
 
     del system
 
